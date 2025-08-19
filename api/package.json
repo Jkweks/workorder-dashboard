@@ -1,0 +1,18 @@
+{
+  "name": "workorder-api",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dayjs": "^1.11.10",
+    "express": "^4.19.2",
+    "morgan": "^1.10.0",
+    "pdfkit": "^0.15.0",
+    "pg": "^8.11.3"
+  }
+}

@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15
+    container_name: workorder_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: workuser
+      POSTGRES_PASSWORD: workpass
+      POSTGRES_DB: workorders
+    ports:
+      - "5436:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./api/migrations.sql:/docker-entrypoint-initdb.d/migrations.sql
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: workorder_api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://workuser:workpass@db:5432/workorders
+      PORT: 4000
+      NODE_ENV: development
+    depends_on:
+      - db
+    ports:
+      - "4000:4000"
+
+  web-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: workorder_web_dev
+    ports:
+      - "5173:5173"
+    environment:
+      - HOST=0.0.0.0
+      - VITE_API_URL=http://192.168.4.251:4000
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+    depends_on:
+      - api
+
+  web-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: workorder_web_prod
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  db_data:
