@@ -82,6 +82,8 @@ type WorkOrder = {
   workOrderNumber: string; // system generated
   materialDeliveryDate: string; // ISO date
   requestedCompletionDates: string[]; // supports multiple
+  completionDate: string; // aggregated completion
+  completionVaries: boolean;
   // Content
   items: WorkOrderItem[];
   status: Status;
@@ -126,7 +128,13 @@ function loadLocal<T>(key: string, fallback: T): T {
 // Root App
 // ======================
 export default function App() {
-  const [orders, setOrders] = useState<WorkOrder[]>(() => loadLocal("wo:data", []));
+  const [orders, setOrders] = useState<WorkOrder[]>(() =>
+    loadLocal<WorkOrder[]>("wo:data", []).map((o) => ({
+      ...o,
+      completionDate: o.completionDate || "",
+      completionVaries: o.completionVaries || false,
+    }))
+  );
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<Status | "All">("All");
   const [showForm, setShowForm] = useState(false);
@@ -153,6 +161,8 @@ export default function App() {
           workOrderNumber: o.work_order_number,
           materialDeliveryDate: o.material_delivery_date || "",
           requestedCompletionDates: o.requested_completion_dates || [],
+          completionDate: o.completion_date || "",
+          completionVaries: o.completion_varies || false,
           items: [],
           status: (o.status || "Draft") as Status,
           createdAt: o.created_at,
@@ -187,6 +197,8 @@ export default function App() {
           dateIssued: o.dateIssued,
           materialDeliveryDate: o.materialDeliveryDate || null,
           requestedCompletionDates: o.requestedCompletionDates || [],
+          completionDate: o.completionDate || null,
+          completionVaries: o.completionVaries || false,
           status: o.status,
           items: o.items.map((it) => ({
             type: it.type,
@@ -209,6 +221,8 @@ export default function App() {
           workOrderNumber: created.work_order_number,
           materialDeliveryDate: created.material_delivery_date || "",
           requestedCompletionDates: created.requested_completion_dates || [],
+          completionDate: created.completion_date || "",
+          completionVaries: created.completion_varies || false,
           items: [],
           status: (created.status || "Draft") as Status,
           createdAt: created.created_at,
@@ -239,6 +253,8 @@ export default function App() {
           dateIssued: finalObj.dateIssued,
           materialDeliveryDate: finalObj.materialDeliveryDate || null,
           requestedCompletionDates: finalObj.requestedCompletionDates || [],
+          completionDate: finalObj.completionDate || null,
+          completionVaries: finalObj.completionVaries || false,
           status: finalObj.status,
           items: (finalObj.items || []).map((it) => ({
             type: it.type,
@@ -344,7 +360,14 @@ export default function App() {
             )}
           </div>
         ) : (
-          <WorkOrderTable orders={filtered} onUpdate={onUpdate} onDelete={onDelete} />
+          <WorkOrderTable
+            orders={filtered}
+            onUpdate={onUpdate}
+            onDelete={onDelete}
+            onOpen={(id) => {
+              setViewMode('cards');
+            }}
+          />
         )}
       </main>
     </div>
@@ -364,6 +387,7 @@ function WorkOrderForm({ onCreate }: { onCreate: (o: WorkOrder) => void }) {
     dateIssued: todayISO(),
     materialDeliveryDate: "",
     requestedCompletionDates: [] as string[],
+    completionDate: "",
   });
 
   const [items, setItems] = useState<WorkOrderItem[]>([]);
@@ -406,6 +430,21 @@ function WorkOrderForm({ onCreate }: { onCreate: (o: WorkOrder) => void }) {
     }));
 
   const create = () => {
+    let preparedItems = items.map((it) => ({ ...it, quantity: Number(it.quantity) || 0 }));
+    let completionDate = summary.completionDate;
+    let completionVaries = false;
+    if (summary.completionDate) {
+      preparedItems = preparedItems.map((it) => ({
+        ...it,
+        completionDates: [summary.completionDate],
+      }));
+    } else {
+      const allDates = preparedItems.flatMap((it) => it.completionDates || []);
+      const uniq = Array.from(new Set(allDates));
+      completionDate = uniq.sort().slice(-1)[0] || "";
+      completionVaries = uniq.length > 1;
+    }
+
     const workOrder: WorkOrder = {
       id: uid(),
       jobNumber: summary.jobNumber.trim(),
@@ -417,7 +456,9 @@ function WorkOrderForm({ onCreate }: { onCreate: (o: WorkOrder) => void }) {
       workOrderNumber: "(pending)", // API will generate the real value
       materialDeliveryDate: summary.materialDeliveryDate || "",
       requestedCompletionDates: summary.requestedCompletionDates || [],
-      items: items.map((it) => ({ ...it, quantity: Number(it.quantity) || 0 })),
+      completionDate,
+      completionVaries,
+      items: preparedItems,
       status: "Draft",
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -434,6 +475,7 @@ function WorkOrderForm({ onCreate }: { onCreate: (o: WorkOrder) => void }) {
       dateIssued: todayISO(),
       materialDeliveryDate: "",
       requestedCompletionDates: [],
+      completionDate: "",
     });
     setItems([]);
     addItem();
@@ -483,6 +525,11 @@ function WorkOrderForm({ onCreate }: { onCreate: (o: WorkOrder) => void }) {
           label="Material Delivery Date"
           value={summary.materialDeliveryDate}
           onChange={(v) => setSummary({ ...summary, materialDeliveryDate: v })}
+        />
+        <DateField
+          label="Completion Date"
+          value={summary.completionDate}
+          onChange={(v) => setSummary({ ...summary, completionDate: v })}
         />
 
         {/* Requested completion dates (support multiple) */}
@@ -644,10 +691,12 @@ function WorkOrderTable({
   orders,
   onUpdate,
   onDelete,
+  onOpen,
 }: {
   orders: WorkOrder[];
   onUpdate: (id: string, patch: Partial<WorkOrder>) => void;
   onDelete: (id: string) => void;
+  onOpen: (id: string) => void;
 }) {
   if (orders.length === 0)
     return (
@@ -662,6 +711,7 @@ function WorkOrderTable({
             <th className="p-2">WO #</th>
             <th className="p-2">Job #</th>
             <th className="p-2">PM</th>
+            <th className="p-2">Completion</th>
             <th className="p-2">Status</th>
             <th className="p-2">Actions</th>
           </tr>
@@ -677,6 +727,9 @@ function WorkOrderTable({
               <td className="p-2">{o.jobNumber}</td>
               <td className="p-2">{o.jobPM || "—"}</td>
               <td className="p-2">
+                {o.completionVaries ? "Varies" : o.completionDate || "—"}
+              </td>
+              <td className="p-2">
                 <select
                   value={o.status}
                   onChange={(e) => onUpdate(o.id, { status: e.target.value as Status })}
@@ -690,6 +743,12 @@ function WorkOrderTable({
                 </select>
               </td>
               <td className="p-2 space-x-2">
+                <button
+                  onClick={() => onOpen(o.id)}
+                  className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600"
+                >
+                  Open
+                </button>
                 <a
                   href={apiPdfUrl(o.id)}
                   target="_blank"
@@ -773,7 +832,11 @@ function WorkOrderCard({
             }
           : it
       );
-      onUpdate(order.id, { items: updated });
+      const allDates = updated.flatMap((i) => i.completionDates || []);
+      const uniq = Array.from(new Set(allDates));
+      const completionDate = uniq.sort().slice(-1)[0] || "";
+      const completionVaries = uniq.length > 1;
+      onUpdate(order.id, { items: updated, completionDate, completionVaries });
       return updated;
     });
   };
@@ -783,7 +846,11 @@ function WorkOrderCard({
       const updated = (prev || []).map((it) =>
         it.id === id ? { ...it, ...patch } : it
       );
-      onUpdate(order.id, { items: updated });
+      const allDates = updated.flatMap((i) => i.completionDates || []);
+      const uniq = Array.from(new Set(allDates));
+      const completionDate = uniq.sort().slice(-1)[0] || "";
+      const completionVaries = uniq.length > 1;
+      onUpdate(order.id, { items: updated, completionDate, completionVaries });
       return updated;
     });
   };
@@ -826,6 +893,11 @@ function WorkOrderCard({
       <div className="mt-3 flex flex-wrap gap-2">
         {order.materialDeliveryDate && (
           <Badge>Material: {order.materialDeliveryDate}</Badge>
+        )}
+        {order.completionVaries ? (
+          <Badge>Completion: Varies</Badge>
+        ) : (
+          order.completionDate && <Badge>Completion: {order.completionDate}</Badge>
         )}
         {(order.requestedCompletionDates || []).map((d) => (
           <Badge key={d}>Requested: {d}</Badge>
