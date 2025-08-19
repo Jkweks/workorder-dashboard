@@ -47,9 +47,18 @@ function apiPdfUrl(id: string) {
 // ======================
 const ITEM_TYPES = ["Door", "Storefront", "Curtainwall", "Window wall"] as const;
 const STATUSES = ["Draft", "Issued", "In Progress", "On Hold", "Complete"] as const;
+const ITEM_STATUSES = ["In Progress", "On Hold", "Complete"] as const;
+const HOLD_REASONS = [
+  "Material Issues",
+  "Short Material",
+  "Waiting on Answers",
+  "PM/Super Requested",
+] as const;
 
 type ItemType = typeof ITEM_TYPES[number];
 type Status = typeof STATUSES[number];
+type ItemStatus = typeof ITEM_STATUSES[number];
+type HoldReason = typeof HOLD_REASONS[number];
 
 type WorkOrderItem = {
   id: string;
@@ -57,6 +66,8 @@ type WorkOrderItem = {
   elevation: string;
   quantity: number;
   completionDates: string[]; // ISO dates, one or many
+  status: ItemStatus;
+  holdReason?: HoldReason | "";
 };
 
 type WorkOrder = {
@@ -81,6 +92,23 @@ type WorkOrder = {
 // ---- Utilities ----
 const uid = () => Math.random().toString(36).slice(2, 10);
 const todayISO = () => new Date().toISOString().slice(0, 10);
+
+function statusColor(status: string) {
+  switch (status) {
+    case "Draft":
+      return "bg-slate-700";
+    case "Issued":
+      return "bg-green-700";
+    case "In Progress":
+      return "bg-blue-700";
+    case "On Hold":
+      return "bg-orange-600";
+    case "Complete":
+      return "bg-green-900";
+    default:
+      return "bg-slate-900";
+  }
+}
 
 function saveLocal(key: string, value: unknown) {
   localStorage.setItem(key, JSON.stringify(value));
@@ -165,6 +193,8 @@ export default function App() {
             elevation: it.elevation,
             quantity: it.quantity,
             completionDates: it.completionDates || [],
+            status: it.status,
+            holdReason: it.holdReason || null,
           })),
         };
         const created = await apiCreateWorkOrder(payload);
@@ -215,6 +245,8 @@ export default function App() {
             elevation: it.elevation,
             quantity: it.quantity,
             completionDates: it.completionDates || [],
+            status: it.status,
+            holdReason: it.holdReason || null,
           })),
         };
         await apiUpdateWorkOrder(id, payload);
@@ -344,7 +376,15 @@ function WorkOrderForm({ onCreate }: { onCreate: (o: WorkOrder) => void }) {
   const addItem = () =>
     setItems((prev) => [
       ...prev,
-      { id: uid(), type: "Door", elevation: "", quantity: 1, completionDates: [] },
+      {
+        id: uid(),
+        type: "Door",
+        elevation: "",
+        quantity: 1,
+        completionDates: [],
+        status: "In Progress",
+        holdReason: "",
+      },
     ]);
 
   const updateItem = (id: string, patch: Partial<WorkOrderItem>) =>
@@ -500,40 +540,64 @@ function WorkOrderForm({ onCreate }: { onCreate: (o: WorkOrder) => void }) {
                   min={0}
                   onChange={(v) => updateItem(it.id, { quantity: v })}
                 />
-                {/* Per-item completion dates (multiple) */}
-                <div>
-                  <label className="block text-sm text-slate-300 mb-1">Completion Dates</label>
-                  <input
-                    type="date"
-                    className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 w-full"
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val.length === 10) {
-                        updateItem(it.id, {
-                          completionDates: Array.from(
-                            new Set([...(it.completionDates || []), val])
-                          ),
-                        });
-                        e.target.value = "";
-                      }
-                    }}
+                <SelectField
+                  label="Status"
+                  value={it.status}
+                  options={ITEM_STATUSES}
+                  onChange={(v) =>
+                    updateItem(it.id, {
+                      status: v as ItemStatus,
+                      holdReason:
+                        v === "On Hold" ? it.holdReason || HOLD_REASONS[0] : "",
+                    })
+                  }
+                />
+              </div>
+              {it.status === "On Hold" && (
+                <div className="mt-3">
+                  <SelectField
+                    label="Hold Reason"
+                    value={it.holdReason || HOLD_REASONS[0]}
+                    options={HOLD_REASONS}
+                    onChange={(v) =>
+                      updateItem(it.id, { holdReason: v as HoldReason })
+                    }
                   />
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {(it.completionDates || []).map((d) => (
-                      <Chip
-                        key={d}
-                        onRemove={() =>
-                          updateItem(it.id, {
-                            completionDates: (it.completionDates || []).filter(
-                              (x) => x !== d
-                            ),
-                          })
-                        }
-                      >
-                        {d}
-                      </Chip>
-                    ))}
-                  </div>
+                </div>
+              )}
+              {/* Per-item completion dates (multiple) */}
+              <div className="mt-3">
+                <label className="block text-sm text-slate-300 mb-1">Completion Dates</label>
+                <input
+                  type="date"
+                  className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 w-full"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val.length === 10) {
+                      updateItem(it.id, {
+                        completionDates: Array.from(
+                          new Set([...(it.completionDates || []), val])
+                        ),
+                      });
+                      e.target.value = "";
+                    }
+                  }}
+                />
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {(it.completionDates || []).map((d) => (
+                    <Chip
+                      key={d}
+                      onRemove={() =>
+                        updateItem(it.id, {
+                          completionDates: (it.completionDates || []).filter(
+                            (x) => x !== d
+                          ),
+                        })
+                      }
+                    >
+                      {d}
+                    </Chip>
+                  ))}
                 </div>
               </div>
               <div className="mt-2 text-right">
@@ -604,7 +668,10 @@ function WorkOrderTable({
         </thead>
         <tbody>
           {orders.map((o) => (
-            <tr key={o.id} className="border-b border-slate-800">
+            <tr
+              key={o.id}
+              className={`border-b border-slate-800 ${statusColor(o.status)} text-white`}
+            >
               <td className="p-2">{o.jobName}</td>
               <td className="p-2">{o.workOrderNumber}</td>
               <td className="p-2">{o.jobNumber}</td>
@@ -672,7 +739,11 @@ function WorkOrderCard({
         type: (it.type || "Door") as ItemType,
         elevation: it.elevation || "",
         quantity: it.quantity || 0,
-        completionDates: (it.completion_dates || []).map((c: any) => c.completion_date),
+        completionDates: (it.completion_dates || []).map(
+          (c: any) => c.completion_date
+        ),
+        status: (it.status || "In Progress") as ItemStatus,
+        holdReason: it.hold_reason || "",
       }));
       setItems(mapped);
     } catch (e) {
@@ -697,6 +768,8 @@ function WorkOrderCard({
               completionDates: Array.from(
                 new Set([...(it.completionDates || []), date])
               ),
+              status: "Complete" as ItemStatus,
+              holdReason: "" as HoldReason | "",
             }
           : it
       );
@@ -705,8 +778,20 @@ function WorkOrderCard({
     });
   };
 
+  const updateItem = (id: string, patch: Partial<WorkOrderItem>) => {
+    setItems((prev) => {
+      const updated = (prev || []).map((it) =>
+        it.id === id ? { ...it, ...patch } : it
+      );
+      onUpdate(order.id, { items: updated });
+      return updated;
+    });
+  };
+
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+    <div
+      className={`rounded-2xl border border-slate-800 p-4 text-white ${statusColor(order.status)}`}
+    >
       <div
         className="flex items-start gap-3 cursor-pointer"
         onClick={() => setOpen((s) => !s)}
@@ -773,32 +858,73 @@ function WorkOrderCard({
       {open && (
         <div className="mt-3 space-y-2">
           {loading && <div className="text-slate-400 text-sm">Loading items…</div>}
-          {!loading && items && items.map((it) => (
-            <div
-              key={it.id}
-              className="rounded-xl border border-slate-800 bg-slate-950 p-3"
-            >
-              <div className="text-sm font-medium">
-                {it.type} • Elevation: {it.elevation || "—"} • Qty: {it.quantity}
+          {!loading &&
+            items &&
+            items.map((it) => (
+              <div
+                key={it.id}
+                className={`rounded-xl border border-slate-800 p-3 ${statusColor(
+                  it.status
+                )}`}
+              >
+                <div className="text-sm font-medium">
+                  {it.type} • Elevation: {it.elevation || "—"} • Qty: {it.quantity}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  <select
+                    value={it.status}
+                    onChange={(e) =>
+                      updateItem(it.id, {
+                        status: e.target.value as ItemStatus,
+                        holdReason:
+                          e.target.value === "On Hold" ? it.holdReason : "",
+                      })
+                    }
+                    className="px-2 py-1 rounded bg-slate-950 border border-slate-700"
+                  >
+                    {ITEM_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                  {it.status === "On Hold" && (
+                    <select
+                      value={it.holdReason || ""}
+                      onChange={(e) =>
+                        updateItem(it.id, {
+                          holdReason: e.target.value as HoldReason,
+                        })
+                      }
+                      className="px-2 py-1 rounded bg-slate-950 border border-slate-700"
+                    >
+                      <option value="">Select reason</option>
+                      {HOLD_REASONS.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {it.status !== "Complete" && (
+                    <button
+                      onClick={() => markComplete(it.id)}
+                      className="px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600"
+                    >
+                      Mark Complete
+                    </button>
+                  )}
+                </div>
+                <div className="mt-1 text-xs text-slate-300 flex flex-wrap gap-2">
+                  {(it.completionDates || []).map((d) => (
+                    <Badge key={d}>Complete: {d}</Badge>
+                  ))}
+                  {(!it.completionDates || it.completionDates.length === 0) && (
+                    <span className="text-slate-500">No completion dates</span>
+                  )}
+                </div>
               </div>
-              <div className="mt-1 text-xs text-slate-300 flex flex-wrap gap-2">
-                {(it.completionDates || []).map((d) => (
-                  <Badge key={d}>Complete: {d}</Badge>
-                ))}
-                {(!it.completionDates || it.completionDates.length === 0) && (
-                  <span className="text-slate-500">No completion dates</span>
-                )}
-              </div>
-              <div className="mt-2">
-                <button
-                  onClick={() => markComplete(it.id)}
-                  className="text-xs px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600"
-                >
-                  Mark Complete
-                </button>
-              </div>
-            </div>
-          ))}
+            ))}
           {!loading && !items && (
             <div className="text-slate-500 text-sm">No items loaded.</div>
           )}
