@@ -69,9 +69,16 @@ app.post('/api/work-orders', async (req, res, next) => {
       // items
       for (const it of b.items || []) {
         const { rows: itemRows } = await client.query(
-          `INSERT INTO work_order_items (work_order_id, type, elevation, quantity)
-           VALUES ($1,$2,$3,$4) RETURNING *`,
-          [order.id, it.type, it.elevation || null, it.quantity || 0]
+          `INSERT INTO work_order_items (work_order_id, type, elevation, quantity, status, hold_reason)
+           VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+          [
+            order.id,
+            it.type,
+            it.elevation || null,
+            it.quantity || 0,
+            it.status || 'In Progress',
+            it.holdReason || null,
+          ]
         );
         const item = itemRows[0];
         for (const d of it.completionDates || []) {
@@ -131,9 +138,16 @@ app.put('/api/work-orders/:id', async (req, res, next) => {
 
       for (const it of b.items || []) {
         const { rows: itemRows } = await client.query(
-          `INSERT INTO work_order_items (work_order_id, type, elevation, quantity)
-           VALUES ($1,$2,$3,$4) RETURNING *`,
-          [order.id, it.type, it.elevation || null, it.quantity || 0]
+          `INSERT INTO work_order_items (work_order_id, type, elevation, quantity, status, hold_reason)
+           VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+          [
+            order.id,
+            it.type,
+            it.elevation || null,
+            it.quantity || 0,
+            it.status || 'In Progress',
+            it.holdReason || null,
+          ]
         );
         const item = itemRows[0];
         for (const d of it.completionDates || []) {

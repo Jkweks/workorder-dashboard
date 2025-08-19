@@ -22,7 +22,9 @@ CREATE TABLE IF NOT EXISTS work_order_items (
   work_order_id UUID NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
   type TEXT NOT NULL,
   elevation TEXT,
-  quantity INTEGER NOT NULL DEFAULT 0
+  quantity INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'In Progress',
+  hold_reason TEXT
 );
 
 CREATE TABLE IF NOT EXISTS work_order_item_completion_dates (
