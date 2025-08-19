@@ -102,6 +102,7 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<Status | "All">("All");
   const [showForm, setShowForm] = useState(false);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [apiOk, setApiOk] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -278,6 +279,12 @@ export default function App() {
               ))}
             </select>
             <button
+              onClick={() => setViewMode(viewMode === 'cards' ? 'table' : 'cards')}
+              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700"
+            >
+              {viewMode === 'cards' ? 'Table View' : 'Card View'}
+            </button>
+            <button
               onClick={() => setShowForm((s) => !s)}
               className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition font-medium"
             >
@@ -295,14 +302,18 @@ export default function App() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((o) => (
-            <WorkOrderCard key={o.id} order={o} onUpdate={onUpdate} onDelete={onDelete} />
-          ))}
-          {filtered.length === 0 && (
-            <div className="text-slate-400">No work orders found. Create one to get started.</div>
-          )}
-        </div>
+        {viewMode === 'cards' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filtered.map((o) => (
+              <WorkOrderCard key={o.id} order={o} onUpdate={onUpdate} onDelete={onDelete} />
+            ))}
+            {filtered.length === 0 && (
+              <div className="text-slate-400">No work orders found. Create one to get started.</div>
+            )}
+          </div>
+        ) : (
+          <WorkOrderTable orders={filtered} onUpdate={onUpdate} onDelete={onDelete} />
+        )}
       </main>
     </div>
   );
@@ -441,7 +452,13 @@ function WorkOrderForm({ onCreate }: { onCreate: (o: WorkOrder) => void }) {
             <input
               type="date"
               className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700"
-              onChange={(e) => addRequestedDate(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val.length === 10) {
+                  addRequestedDate(val);
+                  e.target.value = "";
+                }
+              }}
             />
             <span className="text-xs text-slate-400">Add multiple as needed</span>
           </div>
@@ -489,13 +506,17 @@ function WorkOrderForm({ onCreate }: { onCreate: (o: WorkOrder) => void }) {
                   <input
                     type="date"
                     className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 w-full"
-                    onChange={(e) =>
-                      updateItem(it.id, {
-                        completionDates: Array.from(
-                          new Set([...(it.completionDates || []), e.target.value])
-                        ).filter(Boolean),
-                      })
-                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val.length === 10) {
+                        updateItem(it.id, {
+                          completionDates: Array.from(
+                            new Set([...(it.completionDates || []), val])
+                          ),
+                        });
+                        e.target.value = "";
+                      }
+                    }}
                   />
                   <div className="flex flex-wrap gap-2 mt-2">
                     {(it.completionDates || []).map((d) => (
@@ -553,6 +574,79 @@ function WorkOrderForm({ onCreate }: { onCreate: (o: WorkOrder) => void }) {
 }
 
 // ======================
+// Table view
+// ======================
+function WorkOrderTable({
+  orders,
+  onUpdate,
+  onDelete,
+}: {
+  orders: WorkOrder[];
+  onUpdate: (id: string, patch: Partial<WorkOrder>) => void;
+  onDelete: (id: string) => void;
+}) {
+  if (orders.length === 0)
+    return (
+      <div className="text-slate-400">No work orders found. Create one to get started.</div>
+    );
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-sm">
+        <thead>
+          <tr className="text-left bg-slate-900">
+            <th className="p-2">Job Name</th>
+            <th className="p-2">WO #</th>
+            <th className="p-2">Job #</th>
+            <th className="p-2">PM</th>
+            <th className="p-2">Status</th>
+            <th className="p-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((o) => (
+            <tr key={o.id} className="border-b border-slate-800">
+              <td className="p-2">{o.jobName}</td>
+              <td className="p-2">{o.workOrderNumber}</td>
+              <td className="p-2">{o.jobNumber}</td>
+              <td className="p-2">{o.jobPM || "—"}</td>
+              <td className="p-2">
+                <select
+                  value={o.status}
+                  onChange={(e) => onUpdate(o.id, { status: e.target.value as Status })}
+                  className="px-2 py-1 rounded-lg bg-slate-950 border border-slate-700"
+                >
+                  {STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td className="p-2 space-x-2">
+                <a
+                  href={apiPdfUrl(o.id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500"
+                >
+                  PDF
+                </a>
+                <button
+                  onClick={() => onDelete(o.id)}
+                  className="px-2 py-1 rounded bg-rose-600 hover:bg-rose-500"
+                >
+                  Delete
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ======================
 // Card (now fetches items on expand and adds PDF button)
 // ======================
 function WorkOrderCard({
@@ -593,9 +687,30 @@ function WorkOrderCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  const markComplete = (itemId: string) => {
+    const date = todayISO();
+    setItems((prev) => {
+      const updated = (prev || []).map((it) =>
+        it.id === itemId
+          ? {
+              ...it,
+              completionDates: Array.from(
+                new Set([...(it.completionDates || []), date])
+              ),
+            }
+          : it
+      );
+      onUpdate(order.id, { items: updated });
+      return updated;
+    });
+  };
+
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-      <div className="flex items-start gap-3">
+      <div
+        className="flex items-start gap-3 cursor-pointer"
+        onClick={() => setOpen((s) => !s)}
+      >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <div className="text-lg font-semibold truncate">{order.jobName}</div>
@@ -610,6 +725,7 @@ function WorkOrderCard({
         </div>
         <select
           value={order.status}
+          onClick={(e) => e.stopPropagation()}
           onChange={(e) => onUpdate(order.id, { status: e.target.value as Status })}
           className="px-2 py-1 rounded-lg bg-slate-950 border border-slate-700 text-sm"
         >
@@ -672,6 +788,14 @@ function WorkOrderCard({
                 {(!it.completionDates || it.completionDates.length === 0) && (
                   <span className="text-slate-500">No completion dates</span>
                 )}
+              </div>
+              <div className="mt-2">
+                <button
+                  onClick={() => markComplete(it.id)}
+                  className="text-xs px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600"
+                >
+                  Mark Complete
+                </button>
               </div>
             </div>
           ))}
