@@ -11,7 +11,6 @@ CREATE TABLE IF NOT EXISTS work_orders (
   date_issued DATE NOT NULL,
   work_order_number TEXT UNIQUE NOT NULL,
   material_delivery_date DATE,
-  requested_completion_dates DATE[] DEFAULT '{}',
   completion_date DATE,
   completion_varies BOOLEAN NOT NULL DEFAULT FALSE,
   status TEXT NOT NULL DEFAULT 'Draft',

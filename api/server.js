@@ -56,12 +56,12 @@ app.post('/api/work-orders', async (req, res, next) => {
       const { rows } = await client.query(
         `INSERT INTO work_orders (
           job_number, job_name, job_pm, job_address, job_superintendent,
-          date_issued, work_order_number, material_delivery_date, requested_completion_dates, completion_date, completion_varies, status
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+          date_issued, work_order_number, material_delivery_date, completion_date, completion_varies, status
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
         RETURNING *`,
         [
           b.jobNumber, b.jobName, b.jobPM || null, b.jobAddress || null, b.jobSuperintendent || null,
-          b.dateIssued, woNo, b.materialDeliveryDate || null, b.requestedCompletionDates || [],
+          b.dateIssued, woNo, b.materialDeliveryDate || null,
           b.completionDate || null, b.completionVaries || false, b.status || 'Draft'
         ]
       );
@@ -123,11 +123,11 @@ app.put('/api/work-orders/:id', async (req, res, next) => {
       const { rows } = await client.query(
         `UPDATE work_orders SET
           job_number=$1, job_name=$2, job_pm=$3, job_address=$4, job_superintendent=$5,
-          date_issued=$6, material_delivery_date=$7, requested_completion_dates=$8, completion_date=$9, completion_varies=$10, status=$11, updated_at=now()
-         WHERE id=$12 RETURNING *`,
+          date_issued=$6, material_delivery_date=$7, completion_date=$8, completion_varies=$9, status=$10, updated_at=now()
+         WHERE id=$11 RETURNING *`,
         [
           b.jobNumber, b.jobName, b.jobPM || null, b.jobAddress || null, b.jobSuperintendent || null,
-          b.dateIssued, b.materialDeliveryDate || null, b.requestedCompletionDates || [],
+          b.dateIssued, b.materialDeliveryDate || null,
           b.completionDate || null, b.completionVaries || false, b.status || 'Draft', req.params.id
         ]
       );
