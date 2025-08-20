@@ -9,6 +9,7 @@ import {
   STATUSES,
   ITEM_STATUSES,
   HOLD_REASONS,
+  Scope,
 } from "../types";
 import { todayISO, statusColor } from "../utils";
 import { apiGetWorkOrder, apiPdfUrl } from "../api";
@@ -33,6 +34,7 @@ export default function WorkOrderCard({ order, onUpdate, onDelete, onEdit }: Pro
       const data = await apiGetWorkOrder(order.id);
       const mapped: WorkOrderItem[] = (data.items || []).map((it: any) => ({
         id: it.id,
+        scope: (it.scope || "Kit") as Scope,
         type: (it.type || "Door") as ItemType,
         elevation: it.elevation || "",
         quantity: it.quantity || 0,

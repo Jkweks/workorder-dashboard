@@ -8,13 +8,19 @@ export const HOLD_REASONS = [
   "PM/Super Requested",
 ] as const;
 
+export const SYSTEMS = ["System A", "System B", "System C"] as const;
+export const SCOPES = ["Kit", "Assemble", "Hardware"] as const;
+
 export type ItemType = typeof ITEM_TYPES[number];
 export type Status = typeof STATUSES[number];
 export type ItemStatus = typeof ITEM_STATUSES[number];
 export type HoldReason = typeof HOLD_REASONS[number];
+export type System = typeof SYSTEMS[number];
+export type Scope = typeof SCOPES[number];
 
 export type WorkOrderItem = {
   id: string;
+  scope: Scope;
   type: ItemType;
   elevation: string;
   quantity: number;
@@ -27,10 +33,13 @@ export type WorkOrder = {
   id: string;
   // Summary fields
   jobNumber: string;
+  division: string;
   jobName: string;
   jobPM: string;
   jobAddress: string;
   jobSuperintendent: string;
+  system: System;
+  notes: string;
   dateIssued: string; // ISO date
   workOrderNumber: string; // system generated
   materialDeliveryDate: string; // ISO date

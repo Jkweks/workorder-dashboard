@@ -15,18 +15,23 @@ export function workOrderPdf(order, items) {
   label('Job Name', order.job_name);
   label('PM', order.job_pm);
   label('Superintendent', order.job_superintendent);
+  label('Division', order.division);
+  label('System', order.system);
   label('Address', order.job_address);
   label('Date Issued', order.date_issued);
   label('Material Delivery', order.material_delivery_date || '—');
   label('Completion', order.completion_varies ? 'Varies' : order.completion_date || '—');
   label('Status', order.status);
+  label('Notes', order.notes);
 
   doc.moveDown(0.75);
   doc.fontSize(12).text('Items', { underline: true });
 
   items.forEach((it, idx) => {
     doc.moveDown(0.35);
-    doc.font('Helvetica-Bold').text(`${idx + 1}. ${it.type}  •  Elevation: ${it.elevation || '—'}  •  Qty: ${it.quantity}`);
+    doc
+      .font('Helvetica-Bold')
+      .text(`${idx + 1}. ${it.type}  •  Scope: ${it.scope || '—'}  •  Elevation: ${it.elevation || '—'}  •  Qty: ${it.quantity}`);
     const dates = (it.completion_dates || []).map((d) => d.completion_date).join(', ');
     doc.font('Helvetica').fontSize(10).text(`Completion Dates: ${dates || '—'}`);
   });
