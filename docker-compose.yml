@@ -54,7 +54,7 @@ services:
       dockerfile: Dockerfile
     container_name: workorder_web_prod
     ports:
-      - "8080:80"
+      - "8025:80"
     depends_on:
       - api
 
