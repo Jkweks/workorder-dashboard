@@ -18,7 +18,6 @@ export function workOrderPdf(order, items) {
   label('Address', order.job_address);
   label('Date Issued', order.date_issued);
   label('Material Delivery', order.material_delivery_date || '—');
-  label('Requested Completion', (order.requested_completion_dates || []).join(', ') || '—');
   label('Completion', order.completion_varies ? 'Varies' : order.completion_date || '—');
   label('Status', order.status);
 

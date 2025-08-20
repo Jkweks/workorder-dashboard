@@ -81,7 +81,6 @@ type WorkOrder = {
   dateIssued: string; // ISO date
   workOrderNumber: string; // system generated
   materialDeliveryDate: string; // ISO date
-  requestedCompletionDates: string[]; // supports multiple
   completionDate: string; // aggregated completion
   completionVaries: boolean;
   // Content
@@ -138,6 +137,7 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<Status | "All">("All");
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<WorkOrder | null>(null);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [apiOk, setApiOk] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
@@ -160,7 +160,6 @@ export default function App() {
           dateIssued: o.date_issued,
           workOrderNumber: o.work_order_number,
           materialDeliveryDate: o.material_delivery_date || "",
-          requestedCompletionDates: o.requested_completion_dates || [],
           completionDate: o.completion_date || "",
           completionVaries: o.completion_varies || false,
           items: [],
@@ -196,7 +195,6 @@ export default function App() {
           jobSuperintendent: o.jobSuperintendent,
           dateIssued: o.dateIssued,
           materialDeliveryDate: o.materialDeliveryDate || null,
-          requestedCompletionDates: o.requestedCompletionDates || [],
           completionDate: o.completionDate || null,
           completionVaries: o.completionVaries || false,
           status: o.status,
@@ -220,7 +218,6 @@ export default function App() {
           dateIssued: created.date_issued,
           workOrderNumber: created.work_order_number,
           materialDeliveryDate: created.material_delivery_date || "",
-          requestedCompletionDates: created.requested_completion_dates || [],
           completionDate: created.completion_date || "",
           completionVaries: created.completion_varies || false,
           items: [],
@@ -252,7 +249,6 @@ export default function App() {
           jobSuperintendent: finalObj.jobSuperintendent,
           dateIssued: finalObj.dateIssued,
           materialDeliveryDate: finalObj.materialDeliveryDate || null,
-          requestedCompletionDates: finalObj.requestedCompletionDates || [],
           completionDate: finalObj.completionDate || null,
           completionVaries: finalObj.completionVaries || false,
           status: finalObj.status,
@@ -344,16 +340,36 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {showForm && (
+        {(showForm || editing) && (
           <div className="mb-6">
-            <WorkOrderForm onCreate={onCreate} />
+            <WorkOrderForm
+              initial={editing || undefined}
+              onSubmit={(o) => {
+                if (editing) {
+                  onUpdate(o.id, o);
+                  setEditing(null);
+                } else {
+                  onCreate(o);
+                }
+              }}
+              onCancel={() => {
+                if (editing) setEditing(null);
+                else setShowForm(false);
+              }}
+            />
           </div>
         )}
 
         {viewMode === 'cards' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map((o) => (
-              <WorkOrderCard key={o.id} order={o} onUpdate={onUpdate} onDelete={onDelete} />
+              <WorkOrderCard
+                key={o.id}
+                order={o}
+                onUpdate={onUpdate}
+                onDelete={onDelete}
+                onEdit={(ord) => setEditing(ord)}
+              />
             ))}
             {filtered.length === 0 && (
               <div className="text-slate-400">No work orders found. Create one to get started.</div>
@@ -367,6 +383,7 @@ export default function App() {
             onOpen={(id) => {
               setViewMode('cards');
             }}
+            onEdit={(o) => setEditing(o)}
           />
         )}
       </main>
@@ -377,25 +394,56 @@ export default function App() {
 // ======================
 // Form (client-side only; API create handled in parent)
 // ======================
-function WorkOrderForm({ onCreate }: { onCreate: (o: WorkOrder) => void }) {
+function WorkOrderForm({
+  initial,
+  onSubmit,
+  onCancel,
+}: {
+  initial?: WorkOrder;
+  onSubmit: (o: WorkOrder) => void;
+  onCancel: () => void;
+}) {
   const [summary, setSummary] = useState({
-    jobNumber: "",
-    jobName: "",
-    jobPM: "",
-    jobAddress: "",
-    jobSuperintendent: "",
-    dateIssued: todayISO(),
-    materialDeliveryDate: "",
-    requestedCompletionDates: [] as string[],
-    completionDate: "",
+    jobNumber: initial?.jobNumber || "",
+    jobName: initial?.jobName || "",
+    jobPM: initial?.jobPM || "",
+    jobAddress: initial?.jobAddress || "",
+    jobSuperintendent: initial?.jobSuperintendent || "",
+    dateIssued: initial?.dateIssued || todayISO(),
+    materialDeliveryDate: initial?.materialDeliveryDate || "",
+    completionDate: initial?.completionDate || "",
   });
 
-  const [items, setItems] = useState<WorkOrderItem[]>([]);
+  const [items, setItems] = useState<WorkOrderItem[]>(initial?.items || []);
 
   useEffect(() => {
-    if (items.length === 0) addItem();
+    if (!initial) addItem();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (initial && initial.id && (!initial.items || initial.items.length === 0)) {
+      (async () => {
+        try {
+          const data = await apiGetWorkOrder(initial.id);
+          const mapped: WorkOrderItem[] = (data.items || []).map((it: any) => ({
+            id: it.id,
+            type: (it.type || "Door") as ItemType,
+            elevation: it.elevation || "",
+            quantity: it.quantity || 0,
+            completionDates: (it.completion_dates || []).map(
+              (c: any) => c.completion_date
+            ),
+            status: (it.status || "In Progress") as ItemStatus,
+            holdReason: it.hold_reason || "",
+          }));
+          setItems(mapped);
+        } catch {
+          // ignore
+        }
+      })();
+    }
+  }, [initial]);
 
   const addItem = () =>
     setItems((prev) => [
@@ -416,20 +464,7 @@ function WorkOrderForm({ onCreate }: { onCreate: (o: WorkOrder) => void }) {
 
   const removeItem = (id: string) => setItems((prev) => prev.filter((it) => it.id !== id));
 
-  const addRequestedDate = (d: string) => {
-    if (!d) return;
-    setSummary((s) => ({
-      ...s,
-      requestedCompletionDates: Array.from(new Set([...(s.requestedCompletionDates || []), d])),
-    }));
-  };
-  const removeRequestedDate = (d: string) =>
-    setSummary((s) => ({
-      ...s,
-      requestedCompletionDates: (s.requestedCompletionDates || []).filter((x) => x !== d),
-    }));
-
-  const create = () => {
+  const save = () => {
     let preparedItems = items.map((it) => ({ ...it, quantity: Number(it.quantity) || 0 }));
     let completionDate = summary.completionDate;
     let completionVaries = false;
@@ -446,46 +481,47 @@ function WorkOrderForm({ onCreate }: { onCreate: (o: WorkOrder) => void }) {
     }
 
     const workOrder: WorkOrder = {
-      id: uid(),
+      id: initial?.id || uid(),
       jobNumber: summary.jobNumber.trim(),
       jobName: summary.jobName.trim(),
       jobPM: summary.jobPM.trim(),
       jobAddress: summary.jobAddress.trim(),
       jobSuperintendent: summary.jobSuperintendent.trim(),
       dateIssued: summary.dateIssued || todayISO(),
-      workOrderNumber: "(pending)", // API will generate the real value
+      workOrderNumber: initial?.workOrderNumber || "(pending)", // API will generate the real value
       materialDeliveryDate: summary.materialDeliveryDate || "",
-      requestedCompletionDates: summary.requestedCompletionDates || [],
       completionDate,
       completionVaries,
       items: preparedItems,
-      status: "Draft",
-      createdAt: Date.now(),
+      status: initial?.status || "Draft",
+      createdAt: initial?.createdAt || Date.now(),
       updatedAt: Date.now(),
     };
 
-    onCreate(workOrder);
-    // reset
-    setSummary({
-      jobNumber: "",
-      jobName: "",
-      jobPM: "",
-      jobAddress: "",
-      jobSuperintendent: "",
-      dateIssued: todayISO(),
-      materialDeliveryDate: "",
-      requestedCompletionDates: [],
-      completionDate: "",
-    });
-    setItems([]);
-    addItem();
+    onSubmit(workOrder);
+    if (!initial) {
+      setSummary({
+        jobNumber: "",
+        jobName: "",
+        jobPM: "",
+        jobAddress: "",
+        jobSuperintendent: "",
+        dateIssued: todayISO(),
+        materialDeliveryDate: "",
+        completionDate: "",
+      });
+      setItems([]);
+      addItem();
+    }
   };
 
   const valid = summary.jobNumber && summary.jobName && items.length > 0;
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow">
-      <div className="text-lg font-semibold mb-3">New Work Order</div>
+      <div className="text-lg font-semibold mb-3">
+        {initial ? "Edit Work Order" : "New Work Order"}
+      </div>
 
       {/* Summary fields */}
       <div className="grid md:grid-cols-2 gap-3">
@@ -531,32 +567,6 @@ function WorkOrderForm({ onCreate }: { onCreate: (o: WorkOrder) => void }) {
           value={summary.completionDate}
           onChange={(v) => setSummary({ ...summary, completionDate: v })}
         />
-
-        {/* Requested completion dates (support multiple) */}
-        <div>
-          <label className="block text-sm text-slate-300 mb-1">Requested Completion Dates</label>
-          <div className="flex gap-2 items-center">
-            <input
-              type="date"
-              className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700"
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val.length === 10) {
-                  addRequestedDate(val);
-                  e.target.value = "";
-                }
-              }}
-            />
-            <span className="text-xs text-slate-400">Add multiple as needed</span>
-          </div>
-          <div className="flex flex-wrap gap-2 mt-2">
-            {(summary.requestedCompletionDates || []).map((d) => (
-              <Chip key={d} onRemove={() => removeRequestedDate(d)}>
-                {d}
-              </Chip>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* Items */}
@@ -667,16 +677,22 @@ function WorkOrderForm({ onCreate }: { onCreate: (o: WorkOrder) => void }) {
             + Add Item
           </button>
           <button
-            onClick={create}
-            disabled={!summary.jobNumber || !summary.jobName || items.length === 0}
+            onClick={save}
+            disabled={!valid}
             className={
               "px-4 py-2 rounded-xl font-medium " +
-              (summary.jobNumber && summary.jobName && items.length > 0
+              (valid
                 ? "bg-indigo-600 hover:bg-indigo-500"
                 : "bg-slate-700 text-slate-400 cursor-not-allowed")
             }
           >
-            Create Work Order
+            {initial ? "Save Changes" : "Create Work Order"}
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600"
+          >
+            Cancel
           </button>
         </div>
       </div>
@@ -692,11 +708,13 @@ function WorkOrderTable({
   onUpdate,
   onDelete,
   onOpen,
+  onEdit,
 }: {
   orders: WorkOrder[];
   onUpdate: (id: string, patch: Partial<WorkOrder>) => void;
   onDelete: (id: string) => void;
   onOpen: (id: string) => void;
+  onEdit: (o: WorkOrder) => void;
 }) {
   if (orders.length === 0)
     return (
@@ -758,6 +776,12 @@ function WorkOrderTable({
                   PDF
                 </a>
                 <button
+                  onClick={() => onEdit(o)}
+                  className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600"
+                >
+                  Edit
+                </button>
+                <button
                   onClick={() => onDelete(o.id)}
                   className="px-2 py-1 rounded bg-rose-600 hover:bg-rose-500"
                 >
@@ -779,10 +803,12 @@ function WorkOrderCard({
   order,
   onUpdate,
   onDelete,
+  onEdit,
 }: {
   order: WorkOrder;
   onUpdate: (id: string, patch: Partial<WorkOrder>) => void;
   onDelete: (id: string) => void;
+  onEdit: (order: WorkOrder) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<WorkOrderItem[] | null>(null);
@@ -899,9 +925,6 @@ function WorkOrderCard({
         ) : (
           order.completionDate && <Badge>Completion: {order.completionDate}</Badge>
         )}
-        {(order.requestedCompletionDates || []).map((d) => (
-          <Badge key={d}>Requested: {d}</Badge>
-        ))}
       </div>
 
       <div className="mt-3 flex items-center gap-2">
@@ -919,6 +942,12 @@ function WorkOrderCard({
         >
           Download PDF
         </a>
+        <button
+          onClick={() => onEdit({ ...order, items: items || [] })}
+          className="text-sm px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600"
+        >
+          Edit
+        </button>
         <button
           onClick={() => onDelete(order.id)}
           className="text-sm px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500"
