@@ -53,14 +53,17 @@ app.post('/api/work-orders', async (req, res, next) => {
     const woNo = await generateWorkOrderNumber();
 
     const result = await tx(async (client) => {
+      const division = b.division || (b.jobNumber || "").toString().trim().charAt(0) || null;
       const { rows } = await client.query(
         `INSERT INTO work_orders (
           job_number, job_name, job_pm, job_address, job_superintendent,
+          division, system, notes,
           date_issued, work_order_number, material_delivery_date, completion_date, completion_varies, status
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
         RETURNING *`,
         [
           b.jobNumber, b.jobName, b.jobPM || null, b.jobAddress || null, b.jobSuperintendent || null,
+          division, b.system || null, b.notes || null,
           b.dateIssued, woNo, b.materialDeliveryDate || null,
           b.completionDate || null, b.completionVaries || false, b.status || 'Draft'
         ]
@@ -70,8 +73,8 @@ app.post('/api/work-orders', async (req, res, next) => {
       // items
       for (const it of b.items || []) {
         const { rows: itemRows } = await client.query(
-          `INSERT INTO work_order_items (work_order_id, type, elevation, quantity, status, hold_reason)
-           VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+          `INSERT INTO work_order_items (work_order_id, type, elevation, quantity, status, hold_reason, scope)
+           VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
           [
             order.id,
             it.type,
@@ -79,6 +82,7 @@ app.post('/api/work-orders', async (req, res, next) => {
             it.quantity || 0,
             it.status || 'In Progress',
             it.holdReason || null,
+            it.scope || null,
           ]
         );
         const item = itemRows[0];
@@ -120,13 +124,16 @@ app.put('/api/work-orders/:id', async (req, res, next) => {
   try {
     const b = req.body || {};
     const updated = await tx(async (client) => {
+      const division = b.division || (b.jobNumber || "").toString().trim().charAt(0) || null;
       const { rows } = await client.query(
         `UPDATE work_orders SET
           job_number=$1, job_name=$2, job_pm=$3, job_address=$4, job_superintendent=$5,
-          date_issued=$6, material_delivery_date=$7, completion_date=$8, completion_varies=$9, status=$10, updated_at=now()
-         WHERE id=$11 RETURNING *`,
+          division=$6, system=$7, notes=$8,
+          date_issued=$9, material_delivery_date=$10, completion_date=$11, completion_varies=$12, status=$13, updated_at=now()
+         WHERE id=$14 RETURNING *`,
         [
           b.jobNumber, b.jobName, b.jobPM || null, b.jobAddress || null, b.jobSuperintendent || null,
+          division, b.system || null, b.notes || null,
           b.dateIssued, b.materialDeliveryDate || null,
           b.completionDate || null, b.completionVaries || false, b.status || 'Draft', req.params.id
         ]
@@ -140,8 +147,8 @@ app.put('/api/work-orders/:id', async (req, res, next) => {
 
       for (const it of b.items || []) {
         const { rows: itemRows } = await client.query(
-          `INSERT INTO work_order_items (work_order_id, type, elevation, quantity, status, hold_reason)
-           VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+          `INSERT INTO work_order_items (work_order_id, type, elevation, quantity, status, hold_reason, scope)
+           VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
           [
             order.id,
             it.type,
@@ -149,6 +156,7 @@ app.put('/api/work-orders/:id', async (req, res, next) => {
             it.quantity || 0,
             it.status || 'In Progress',
             it.holdReason || null,
+            it.scope || null,
           ]
         );
         const item = itemRows[0];

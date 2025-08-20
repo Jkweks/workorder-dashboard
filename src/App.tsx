@@ -22,6 +22,9 @@ export default function App() {
       ...o,
       completionDate: o.completionDate || "",
       completionVaries: o.completionVaries || false,
+      division: o.division || "",
+      system: o.system || "",
+      notes: o.notes || "",
     }))
   );
   const [query, setQuery] = useState("");
@@ -43,10 +46,13 @@ export default function App() {
         const mapped: WorkOrder[] = data.map((o: any) => ({
           id: o.id,
           jobNumber: o.job_number,
+          division: o.division || "",
           jobName: o.job_name,
           jobPM: o.job_pm || "",
           jobAddress: o.job_address || "",
           jobSuperintendent: o.job_superintendent || "",
+          system: o.system || "",
+          notes: o.notes || "",
           dateIssued: o.date_issued,
           workOrderNumber: o.work_order_number,
           materialDeliveryDate: o.material_delivery_date || "",
@@ -79,10 +85,13 @@ export default function App() {
       try {
         const payload = {
           jobNumber: o.jobNumber,
+          division: o.division,
           jobName: o.jobName,
           jobPM: o.jobPM,
           jobAddress: o.jobAddress,
           jobSuperintendent: o.jobSuperintendent,
+          system: o.system,
+          notes: o.notes,
           dateIssued: o.dateIssued,
           materialDeliveryDate: o.materialDeliveryDate || null,
           completionDate: o.completionDate || null,
@@ -90,6 +99,7 @@ export default function App() {
           status: o.status,
           items: o.items.map((it) => ({
             type: it.type,
+            scope: it.scope,
             elevation: it.elevation,
             quantity: it.quantity,
             completionDates: it.completionDates || [],
@@ -101,16 +111,19 @@ export default function App() {
         const mapped: WorkOrder = {
           id: created.id,
           jobNumber: created.job_number,
+          division: created.division || o.division,
           jobName: created.job_name,
           jobPM: created.job_pm || "",
           jobAddress: created.job_address || "",
           jobSuperintendent: created.job_superintendent || "",
+          system: created.system || o.system,
+          notes: created.notes || o.notes,
           dateIssued: created.date_issued,
           workOrderNumber: created.work_order_number,
           materialDeliveryDate: created.material_delivery_date || "",
           completionDate: created.completion_date || "",
           completionVaries: created.completion_varies || false,
-          items: [],
+          items: o.items,
           status: (created.status || "Draft") as Status,
           createdAt: created.created_at,
           updatedAt: created.updated_at,
@@ -133,10 +146,13 @@ export default function App() {
         const finalObj = { ...(merged as any), ...patch } as WorkOrder;
         const payload = {
           jobNumber: finalObj.jobNumber,
+          division: finalObj.division,
           jobName: finalObj.jobName,
           jobPM: finalObj.jobPM,
           jobAddress: finalObj.jobAddress,
           jobSuperintendent: finalObj.jobSuperintendent,
+          system: finalObj.system,
+          notes: finalObj.notes,
           dateIssued: finalObj.dateIssued,
           materialDeliveryDate: finalObj.materialDeliveryDate || null,
           completionDate: finalObj.completionDate || null,
@@ -144,6 +160,7 @@ export default function App() {
           status: finalObj.status,
           items: (finalObj.items || []).map((it) => ({
             type: it.type,
+            scope: it.scope,
             elevation: it.elevation,
             quantity: it.quantity,
             completionDates: it.completionDates || [],

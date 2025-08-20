@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS work_orders (
   job_pm TEXT,
   job_address TEXT,
   job_superintendent TEXT,
+  division TEXT,
+  system TEXT,
+  notes TEXT,
   date_issued DATE NOT NULL,
   work_order_number TEXT UNIQUE NOT NULL,
   material_delivery_date DATE,
@@ -25,7 +28,8 @@ CREATE TABLE IF NOT EXISTS work_order_items (
   elevation TEXT,
   quantity INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'In Progress',
-  hold_reason TEXT
+  hold_reason TEXT,
+  scope TEXT
 );
 
 CREATE TABLE IF NOT EXISTS work_order_item_completion_dates (
@@ -36,5 +40,9 @@ CREATE TABLE IF NOT EXISTS work_order_item_completion_dates (
 
 ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS completion_date DATE;
 ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS completion_varies BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS division TEXT;
+ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS system TEXT;
+ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE work_order_items ADD COLUMN IF NOT EXISTS scope TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
