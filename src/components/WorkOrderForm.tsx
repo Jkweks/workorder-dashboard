@@ -8,6 +8,10 @@ import {
   ITEM_TYPES,
   ITEM_STATUSES,
   HOLD_REASONS,
+  System,
+  Scope,
+  SYSTEMS,
+  SCOPES,
 } from "../types";
 import { uid, todayISO } from "../utils";
 import { apiGetWorkOrder } from "../api";
@@ -16,6 +20,7 @@ import NumberField from "./NumberField";
 import DateField from "./DateField";
 import SelectField from "./SelectField";
 import Chip from "./Chip";
+import TextAreaField from "./TextAreaField";
 
 type Props = {
   initial?: WorkOrder;
@@ -26,6 +31,7 @@ type Props = {
 export default function WorkOrderForm({ initial, onSubmit, onCancel }: Props) {
   const [summary, setSummary] = useState({
     jobNumber: initial?.jobNumber || "",
+    system: initial?.system || SYSTEMS[0],
     jobName: initial?.jobName || "",
     jobPM: initial?.jobPM || "",
     jobAddress: initial?.jobAddress || "",
@@ -33,6 +39,7 @@ export default function WorkOrderForm({ initial, onSubmit, onCancel }: Props) {
     dateIssued: initial?.dateIssued || todayISO(),
     materialDeliveryDate: initial?.materialDeliveryDate || "",
     completionDate: initial?.completionDate || "",
+    notes: initial?.notes || "",
   });
 
   const [items, setItems] = useState<WorkOrderItem[]>(initial?.items || []);
@@ -49,6 +56,7 @@ export default function WorkOrderForm({ initial, onSubmit, onCancel }: Props) {
           const data = await apiGetWorkOrder(initial.id);
           const mapped: WorkOrderItem[] = (data.items || []).map((it: any) => ({
             id: it.id,
+            scope: (it.scope || "Kit") as Scope,
             type: (it.type || "Door") as ItemType,
             elevation: it.elevation || "",
             quantity: it.quantity || 0,
@@ -69,6 +77,7 @@ export default function WorkOrderForm({ initial, onSubmit, onCancel }: Props) {
       ...prev,
       {
         id: uid(),
+        scope: "Kit",
         type: "Door",
         elevation: "",
         quantity: 1,
@@ -99,6 +108,7 @@ export default function WorkOrderForm({ initial, onSubmit, onCancel }: Props) {
       completionVaries = uniq.length > 1;
     }
 
+    const division = summary.jobNumber.trim().charAt(0) || "";
     const base: WorkOrder = {
       id: initial?.id || uid(),
       workOrderNumber: initial?.workOrderNumber || uid().slice(0, 6).toUpperCase(),
@@ -106,6 +116,7 @@ export default function WorkOrderForm({ initial, onSubmit, onCancel }: Props) {
       updatedAt: Date.now(),
       status: initial?.status || "Draft",
       ...summary,
+      division,
       items: preparedItems,
       completionDate,
       completionVaries,
@@ -131,15 +142,20 @@ export default function WorkOrderForm({ initial, onSubmit, onCancel }: Props) {
           <TextField label="Project Manager" value={summary.jobPM} onChange={(v) => setSummary((s) => ({ ...s, jobPM: v }))} required />
           <TextField label="Job Address" value={summary.jobAddress} onChange={(v) => setSummary((s) => ({ ...s, jobAddress: v }))} />
           <TextField label="Superintendent" value={summary.jobSuperintendent} onChange={(v) => setSummary((s) => ({ ...s, jobSuperintendent: v }))} />
+          <SelectField label="System" value={summary.system} options={SYSTEMS} onChange={(v) => setSummary((s) => ({ ...s, system: v as System }))} />
           <DateField label="Date Issued" value={summary.dateIssued} onChange={(v) => setSummary((s) => ({ ...s, dateIssued: v }))} />
           <DateField label="Material Delivery" value={summary.materialDeliveryDate} onChange={(v) => setSummary((s) => ({ ...s, materialDeliveryDate: v }))} />
           <DateField label="Completion Date" value={summary.completionDate} onChange={(v) => setSummary((s) => ({ ...s, completionDate: v }))} />
+          <div className="md:col-span-2">
+            <TextAreaField label="Notes" value={summary.notes} onChange={(v) => setSummary((s) => ({ ...s, notes: v }))} />
+          </div>
         </div>
 
         <div className="mt-6 space-y-4">
           {items.map((it) => (
             <div key={it.id} className="rounded-xl border border-slate-800 p-4">
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                <SelectField label="Scope" value={it.scope} options={SCOPES} onChange={(v) => updateItem(it.id, { scope: v as Scope })} />
                 <SelectField label="Item Type" value={it.type} options={ITEM_TYPES} onChange={(v) => updateItem(it.id, { type: v as ItemType })} />
                 <TextField label="Elevation" value={it.elevation} onChange={(v) => updateItem(it.id, { elevation: v })} />
                 <NumberField label="Quantity" value={it.quantity} min={0} onChange={(v) => updateItem(it.id, { quantity: v })} />
