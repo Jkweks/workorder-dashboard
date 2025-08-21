@@ -13,7 +13,6 @@ import {
 import { loadLocal, saveLocal } from "./utils";
 import WorkOrderForm from "./components/WorkOrderForm";
 import WorkOrderTable from "./components/WorkOrderTable";
-import WorkOrderCard from "./components/WorkOrderCard";
 import ExportButton from "./components/ExportButton";
 
 export default function App() {
@@ -31,7 +30,7 @@ export default function App() {
   const [statusFilter, setStatusFilter] = useState<Status | "All">("All");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<WorkOrder | null>(null);
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [viewing, setViewing] = useState<WorkOrder | null>(null);
   const [apiOk, setApiOk] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -227,12 +226,6 @@ export default function App() {
               ))}
             </select>
             <button
-              onClick={() => setViewMode(viewMode === 'cards' ? 'table' : 'cards')}
-              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700"
-            >
-              {viewMode === 'cards' ? 'Table View' : 'Card View'}
-            </button>
-            <button
               onClick={() => setShowForm((s) => !s)}
               className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition font-medium"
             >
@@ -263,33 +256,19 @@ export default function App() {
             />
           </div>
         )}
-
-        {viewMode === 'cards' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filtered.map((o) => (
-              <WorkOrderCard
-                key={o.id}
-                order={o}
-                onUpdate={onUpdate}
-                onDelete={onDelete}
-                onEdit={(ord) => setEditing(ord)}
-              />
-            ))}
-            {filtered.length === 0 && (
-              <div className="text-slate-400">No work orders found. Create one to get started.</div>
-            )}
+        {viewing && (
+          <div className="mb-6">
+            <WorkOrderForm initial={viewing} readOnly onSubmit={() => {}} onCancel={() => setViewing(null)} />
           </div>
-        ) : (
-          <WorkOrderTable
-            orders={filtered}
-            onUpdate={onUpdate}
-            onDelete={onDelete}
-            onOpen={(id) => {
-              setViewMode('cards');
-            }}
-            onEdit={(o) => setEditing(o)}
-          />
         )}
+
+        <WorkOrderTable
+          orders={filtered}
+          onUpdate={onUpdate}
+          onDelete={onDelete}
+          onOpen={(o) => setViewing(o)}
+          onEdit={(o) => setEditing(o)}
+        />
       </main>
     </div>
   );

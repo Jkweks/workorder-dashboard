@@ -7,7 +7,7 @@ type Props = {
   orders: WorkOrder[];
   onUpdate: (id: string, patch: Partial<WorkOrder>) => void;
   onDelete: (id: string) => void;
-  onOpen: (id: string) => void;
+  onOpen: (o: WorkOrder) => void;
   onEdit: (o: WorkOrder) => void;
 };
 
@@ -58,7 +58,7 @@ export default function WorkOrderTable({ orders, onUpdate, onDelete, onOpen, onE
               </td>
               <td className="p-2 space-x-2">
                 <button
-                  onClick={() => onOpen(o.id)}
+                  onClick={() => onOpen(o)}
                   className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600"
                 >
                   Open
