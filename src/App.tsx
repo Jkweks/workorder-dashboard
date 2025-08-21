@@ -3,6 +3,8 @@ import {
   WorkOrder,
   Status,
   STATUSES,
+  ROLES,
+  Role,
 } from "./types";
 import {
   apiListWorkOrders,
@@ -16,6 +18,37 @@ import WorkOrderTable from "./components/WorkOrderTable";
 import ExportButton from "./components/ExportButton";
 
 export default function App() {
+  const ALL_STATUSES = STATUSES as unknown as Status[];
+  const ROLE_CONFIG: Record<
+    Role,
+    { visible: Status[]; editable: Status[]; canCreate: boolean; canDelete: boolean }
+  > = {
+    Manager: {
+      visible: ALL_STATUSES,
+      editable: ALL_STATUSES,
+      canCreate: true,
+      canDelete: true,
+    },
+    "Project Manager": {
+      visible: ALL_STATUSES,
+      editable: ["Draft", "Submitted for Review"],
+      canCreate: true,
+      canDelete: false,
+    },
+    "Fab Manager": {
+      visible: ALL_STATUSES,
+      editable: ["Submitted for Review", "Released to Fab", "Completed"],
+      canCreate: false,
+      canDelete: false,
+    },
+    Fabricator: {
+      visible: ["Submitted for Review", "Released to Fab", "Completed"],
+      editable: ["Released to Fab", "Completed"],
+      canCreate: false,
+      canDelete: false,
+    },
+  };
+
   const [orders, setOrders] = useState<WorkOrder[]>(() =>
     loadLocal<WorkOrder[]>("wo:data", []).map((o) => ({
       ...o,
@@ -28,6 +61,7 @@ export default function App() {
   );
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<Status | "All">("All");
+  const [role, setRole] = useState<Role>("Manager");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<WorkOrder | null>(null);
   const [viewing, setViewing] = useState<WorkOrder | null>(null);
@@ -186,7 +220,9 @@ export default function App() {
   };
 
   const filtered = useMemo(() => {
+    const config = ROLE_CONFIG[role];
     return orders.filter((o) => {
+      const visible = config.visible.includes(o.status);
       const matchesStatus = statusFilter === "All" ? true : o.status === statusFilter;
       const q = query.trim().toLowerCase();
       const matchesQ = q
@@ -194,9 +230,9 @@ export default function App() {
             .filter(Boolean)
             .some((s) => s.toLowerCase().includes(q))
         : true;
-      return matchesStatus && matchesQ;
+      return visible && matchesStatus && matchesQ;
     });
-  }, [orders, query, statusFilter]);
+  }, [orders, query, statusFilter, role]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -207,6 +243,20 @@ export default function App() {
           {loading && <span className="ml-2 text-xs text-sky-400">Loading…</span>}
           {error && <span className="ml-2 text-xs text-amber-400">{error}</span>}
           <div className="ml-auto flex items-center gap-2">
+            <select
+              value={role}
+              onChange={(e) => {
+                setRole(e.target.value as Role);
+                setStatusFilter("All");
+              }}
+              className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700"
+            >
+              {ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -219,18 +269,20 @@ export default function App() {
               className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700"
             >
               <option value="All">All statuses</option>
-              {STATUSES.map((s) => (
+              {ROLE_CONFIG[role].visible.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
               ))}
             </select>
-            <button
-              onClick={() => setShowForm((s) => !s)}
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition font-medium"
-            >
-              {showForm ? "Close Form" : "New Work Order"}
-            </button>
+            {ROLE_CONFIG[role].canCreate && (
+              <button
+                onClick={() => setShowForm((s) => !s)}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition font-medium"
+              >
+                {showForm ? "Close Form" : "New Work Order"}
+              </button>
+            )}
             <ExportButton orders={orders} />
           </div>
         </div>
@@ -268,6 +320,8 @@ export default function App() {
           onDelete={onDelete}
           onOpen={(o) => setViewing(o)}
           onEdit={(o) => setEditing(o)}
+          editableStatuses={ROLE_CONFIG[role].editable}
+          canDelete={ROLE_CONFIG[role].canDelete}
         />
       </main>
     </div>

@@ -5,14 +5,17 @@ export function statusColor(status: string) {
   switch (status) {
     case "Draft":
       return "bg-slate-700";
-    case "Issued":
-      return "bg-green-700";
+    case "Submitted for Review":
+      return "bg-amber-700";
+    case "Released to Fab":
+      return "bg-blue-700";
+    case "Completed":
+    case "Complete":
+      return "bg-green-900";
     case "In Progress":
       return "bg-blue-700";
     case "On Hold":
       return "bg-orange-600";
-    case "Complete":
-      return "bg-green-900";
     default:
       return "bg-slate-900";
   }
