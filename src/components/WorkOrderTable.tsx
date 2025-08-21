@@ -9,9 +9,11 @@ type Props = {
   onDelete: (id: string) => void;
   onOpen: (o: WorkOrder) => void;
   onEdit: (o: WorkOrder) => void;
+  editableStatuses: Status[];
+  canDelete: boolean;
 };
 
-export default function WorkOrderTable({ orders, onUpdate, onDelete, onOpen, onEdit }: Props) {
+export default function WorkOrderTable({ orders, onUpdate, onDelete, onOpen, onEdit, editableStatuses, canDelete }: Props) {
   if (orders.length === 0)
     return (
       <div className="text-slate-400">No work orders found. Create one to get started.</div>
@@ -48,6 +50,7 @@ export default function WorkOrderTable({ orders, onUpdate, onDelete, onOpen, onE
                   value={o.status}
                   onChange={(e) => onUpdate(o.id, { status: e.target.value as Status })}
                   className="px-2 py-1 rounded-lg bg-slate-950 border border-slate-700"
+                  disabled={!editableStatuses.includes(o.status)}
                 >
                   {STATUSES.map((s) => (
                     <option key={s} value={s}>
@@ -71,18 +74,22 @@ export default function WorkOrderTable({ orders, onUpdate, onDelete, onOpen, onE
                 >
                   PDF
                 </a>
-                <button
-                  onClick={() => onEdit(o)}
-                  className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => onDelete(o.id)}
-                  className="px-2 py-1 rounded bg-rose-600 hover:bg-rose-500"
-                >
-                  Delete
-                </button>
+                {editableStatuses.includes(o.status) && (
+                  <button
+                    onClick={() => onEdit(o)}
+                    className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600"
+                  >
+                    Edit
+                  </button>
+                )}
+                {canDelete && (
+                  <button
+                    onClick={() => onDelete(o.id)}
+                    className="px-2 py-1 rounded bg-rose-600 hover:bg-rose-500"
+                  >
+                    Delete
+                  </button>
+                )}
               </td>
             </tr>
           ))}

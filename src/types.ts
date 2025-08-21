@@ -1,5 +1,10 @@
 export const ITEM_TYPES = ["Door", "Storefront", "Curtainwall", "Window wall"] as const;
-export const STATUSES = ["Draft", "Issued", "In Progress", "On Hold", "Complete"] as const;
+export const STATUSES = [
+  "Draft",
+  "Submitted for Review",
+  "Released to Fab",
+  "Completed",
+] as const;
 export const ITEM_STATUSES = ["In Progress", "On Hold", "Complete"] as const;
 export const HOLD_REASONS = [
   "Material Issues",
@@ -11,12 +16,20 @@ export const HOLD_REASONS = [
 export const SYSTEMS = ["System A", "System B", "System C"] as const;
 export const SCOPES = ["Kit", "Assemble", "Hardware"] as const;
 
+export const ROLES = [
+  "Project Manager",
+  "Fab Manager",
+  "Fabricator",
+  "Manager",
+] as const;
+
 export type ItemType = typeof ITEM_TYPES[number];
 export type Status = typeof STATUSES[number];
 export type ItemStatus = typeof ITEM_STATUSES[number];
 export type HoldReason = typeof HOLD_REASONS[number];
 export type System = typeof SYSTEMS[number];
 export type Scope = typeof SCOPES[number];
+export type Role = typeof ROLES[number];
 
 export type WorkOrderItem = {
   id: string;
