@@ -6,12 +6,14 @@ export default function TextField({
   onChange,
   placeholder,
   required,
+  disabled,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   required?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <div>
@@ -22,7 +24,8 @@ export default function TextField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 w-full outline-none focus:ring-2 focus:ring-indigo-500"
+        disabled={disabled}
+        className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 w-full outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
       />
     </div>
   );
